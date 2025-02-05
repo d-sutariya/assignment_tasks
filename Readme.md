@@ -1,7 +1,8 @@
 # Summary of Findings  
 
 ## **Most Profitable Customers**  
-- Older customers contribute the most to revenue.  
+- Older customers contribute the most to revenue.
+  ![](https://github.com/d-sutariya/assignment_tasks/blob/master/images/AGE_GROUP%20VS%20LOYALITY.png)
 - Customers living with family generate higher revenue.  
 - There is no strong correlation between premium/budget customers and profitability.  
 
