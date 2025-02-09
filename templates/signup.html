@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup - OTP Verification</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h2>Signup - OTP Verification</h2>
+        
+        <!-- Step 1: Enter Email -->
+        <div id="email-section">
+            <input type="email" id="email" placeholder="Enter your email">
+            <button onclick="sendOTP()">Send OTP</button>
+            <p id="otp-message"></p>
+        </div>
+
+        <!-- Step 2: Enter OTP (Visible after OTP is sent) -->
+        <div id="otp-section" style="display: none;">
+            <input type="text" id="otp" placeholder="Enter OTP">
+            <button onclick="verifyOTP()">Verify OTP</button>
+            <p id="verify-message"></p>
+        </div>
+    </div>
+
+    <script>
+        function sendOTP() {
+            let email = document.getElementById("email").value;
+            fetch("/send_otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("otp-message").innerText = data.message;
+                if (data.message === "OTP sent successfully") {
+                    document.getElementById("otp-section").style.display = "block";
+                }
+            });
+        }
+
+        function verifyOTP() {
+            let email = document.getElementById("email").value;
+            let otp = document.getElementById("otp").value;
+            fetch("/verify_otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: email, otp: otp })
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById("verify-message").innerText = data.message;
+                if (data.message === "OTP verified successfully!") {
+                    alert("Signup Successful!");
+                    window.location.href = "/login";
+                }
+            });
+        }
+    </script>
+</body>
+</html>

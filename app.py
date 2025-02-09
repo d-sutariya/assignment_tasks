@@ -1,7 +1,7 @@
 import random
 import smtplib
 import time
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify , render_template
 from email.message import EmailMessage
 from dotenv import load_dotenv
 import os
@@ -102,6 +102,14 @@ def verify_otp():
     else:
         otp_storage[email]["attempts_left"] -= 1  # Reduce attempt count
         return jsonify({"error": "Incorrect OTP. Attempts left: {}".format(otp_storage[email]["attempts_left"])}), 400
+
+@app.route('/')
+def home():
+    return render_template('signup.html')
+
+@app.route('/login')
+def login():
+    return render_template('login.html')
 
 if __name__ == '__main__':
     app.run(debug=True)
