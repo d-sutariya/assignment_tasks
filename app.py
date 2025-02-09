@@ -1,58 +1,107 @@
+import random
+import smtplib
+import time
 from flask import Flask, request, jsonify
-import firebase_admin
-from firebase_admin import credentials
-import requests
+from email.message import EmailMessage
 from dotenv import load_dotenv
 import os
 
+# Load environment variables
 load_dotenv()
-# Initialize Flask App
+GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD")
+MY_GMAIL = os.getenv("MY_GMAIL")
+
+# SMTP Server Details
+SMTP_SERVER = "smtp.gmail.com"
+SMTP_PORT = 587
+EMAIL_ADDRESS = MY_GMAIL
+APP_PASSWORD = GMAIL_APP_PASSWORD
+
 app = Flask(__name__)
 
-# Load Firebase Admin SDK
-cred = credentials.Certificate("private_keys/firebase_config.json")
-firebase_admin.initialize_app(cred)
+# Store OTPs in memory (For production, use a database)
+otp_storage = {}
 
-# Firebase API Key (Get from Firebase Console → Project Settings → General)
-FIREBASE_API_KEY = os.getenv("FIREBASE_API_KEY")
+# Function to generate a 6-digit OTP
+def generate_otp():
+    return str(random.randint(100000, 999999))
 
-@app.route("/send_otp", methods=["POST"])
+# Function to send OTP via email
+def send_otp_email(email, otp):
+    try:
+        msg = EmailMessage()
+        msg.set_content(f"Your OTP for verification is: {otp}")
+        msg["Subject"] = "Your OTP Code"
+        msg["From"] = EMAIL_ADDRESS
+        msg["To"] = email
+
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
+            server.starttls()  # Secure the connection
+            server.login(EMAIL_ADDRESS, APP_PASSWORD)  # Log in with App Password
+            server.send_message(msg)
+
+        return True
+    except Exception as e:
+        print("Error sending email:", e)
+        return False
+
+# API to generate and send OTP
+@app.route('/send_otp', methods=['POST'])
 def send_otp():
-    """Send OTP to user via Firebase"""
-    phone_number = request.json.get("phone")
+    data = request.get_json()
+    email = data.get("email")
 
-    if not phone_number:
-        return jsonify({"error": "Phone number is required"}), 400
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
 
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:sendVerificationCode?key={FIREBASE_API_KEY}"
-    payload = {"phoneNumber": phone_number}
+    otp = generate_otp()  # Generate OTP
+    current_time = time.time()  # Store current timestamp
 
-    response = requests.post(url, json=payload)
+    # Store OTP details (expires in 5 minutes, max 5 attempts)
+    otp_storage[email] = {
+        "otp": otp,
+        "expires_at": current_time + 300,  # 300 seconds = 5 minutes
+        "attempts_left": 5
+    }
 
-    if response.status_code == 200:
-        session_info = response.json().get("sessionInfo")
-        return jsonify({"message": "OTP sent", "sessionInfo": session_info}), 200
+    if send_otp_email(email, otp):
+        return jsonify({"message": "OTP sent successfully"}), 200
     else:
-        return jsonify({"error": response.json()}), 400
+        return jsonify({"error": "Failed to send OTP"}), 500
 
-@app.route("/verify_otp", methods=["POST"])
+# API to verify OTP
+@app.route('/verify_otp', methods=['POST'])
 def verify_otp():
-    """Verify OTP entered by user"""
-    session_info = request.json.get("sessionInfo")
-    otp = request.json.get("otp")
+    data = request.get_json()
+    email = data.get("email")
+    user_otp = data.get("otp")
 
-    if not session_info or not otp:
-        return jsonify({"error": "Invalid request"}), 400
+    if not email or not user_otp:
+        return jsonify({"error": "Email and OTP are required"}), 400
 
-    url = f"https://identitytoolkit.googleapis.com/v1/accounts:signInWithPhoneNumber?key={FIREBASE_API_KEY}"
-    payload = {"sessionInfo": session_info, "code": otp}
+    otp_data = otp_storage.get(email)
 
-    response = requests.post(url, json=payload)
+    if not otp_data:
+        return jsonify({"error": "No OTP found. Request a new one."}), 400
 
-    if response.status_code == 200:
-        return jsonify({"message": "Valid message"}), 200
+    # Check if OTP is expired
+    if time.time() > otp_data["expires_at"]:
+        otp_storage.pop(email)
+        return jsonify({"error": "OTP has expired. Request a new one."}), 400
+
+    # Check attempts left
+    if otp_data["attempts_left"] <= 0:
+        otp_storage.pop(email)
+        return jsonify({"error": "Maximum attempts reached. Request a new OTP."}), 400
+
+    # Verify OTP
+    print(otp_data["otp"])
+    if otp_data["otp"] == user_otp:
+        otp_storage.pop(email)  # Remove OTP after successful verification
+        return jsonify({"message": "OTP verified successfully!"}), 200
     else:
-        return jsonify({"error": "Invalid OTP"}), 400
+        otp_storage[email]["attempts_left"] -= 1  # Reduce attempt count
+        return jsonify({"error": "Incorrect OTP. Attempts left: {}".format(otp_storage[email]["attempts_left"])}), 400
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     app.run(debug=True)
