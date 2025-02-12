@@ -1,2 +1,4 @@
 private_keys/
 .env
+__pycache__/
+instance/
