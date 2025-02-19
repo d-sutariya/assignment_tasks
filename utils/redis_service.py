@@ -32,3 +32,18 @@ def update_otp_attempts(email, attempts_left):
     if otp_data:
         otp_data["attempts_left"] = attempts_left  # Update attempts
         redis_client.hmset(otp_id, otp_data)  
+
+def store_upload_link(upload_id, user_email, ttl):
+    key = f"upload:{upload_id}"
+    data = {"email": user_email, "timestamp": int(time.time())}
+    # We use HMSET to store a hash and then set an expiration
+    redis_client.hmset(key, data)
+    redis_client.expire(key, ttl)
+
+def get_upload_link(upload_id):
+    key = f"upload:{upload_id}"
+    return redis_client.hgetall(key)
+
+def delete_upload_link(upload_id):
+    key = f"upload:{upload_id}"
+    redis_client.delete(key)

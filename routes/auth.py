@@ -12,6 +12,7 @@ from database.models import db, User
 from utils.redis_service import store_otp, get_otp, delete_otp,update_otp_attempts
 from utils.email_service import send_email
 from config import Config
+import datetime
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -27,8 +28,10 @@ def send_otp():
     otp = str(random.randint(100000, 999999))
     store_otp(email, otp)
 
-    send_email(email, otp)
-
+    response = send_email(email, otp)
+    if not response:
+        jsonify({"message":"Internal Server Error"}),500
+        
     signed_data = jwt.encode({"email": email, "timestamp": int(time.time())}, Config.SIGNING_JWT_SECRET, algorithm="HS256")
     
     return jsonify({"message": "OTP sent successfully", "signed_data": signed_data})
@@ -72,10 +75,17 @@ def verify_otp():
     delete_otp(email)
 
     user = User.query.filter_by(email=email).first()
-    if user:
-        return jsonify({"message": "Hello Existed User"})
-    else:
+    if not user:
         new_user = User(email=email)
         db.session.add(new_user)
         db.session.commit()
-        return jsonify({"message": "Hello New User"})
+
+    # **Generate JWT Token**
+    expiration_time = datetime.datetime.utcnow() + datetime.timedelta(hours=2)  # Token valid for 2 hours
+    token_payload = {
+        "sub": email,
+        "exp": expiration_time
+    }
+    jwt_token = jwt.encode(token_payload, Config.SIGNING_JWT_SECRET, algorithm="HS256")
+
+    return jsonify({"message": "OTP verified successfully", "token": jwt_token})

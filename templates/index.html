@@ -54,6 +54,9 @@
     }
 
     function verifyOTP() {
+    
+      document.getElementById("emailForm").classList.add("hidden");
+
       const email = document.getElementById("email").value;
       const otp = document.getElementById("otp").value;
 
