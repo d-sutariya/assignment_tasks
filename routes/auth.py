@@ -1,15 +1,14 @@
 import random
 import jwt
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, url_for
 import time
-
 from pathlib import Path
 import sys
 sys.path.append(str(Path(__file__).parents[1]))
 
 # user defined modules
 from database.models import db, User
-from utils.redis_service import store_otp, get_otp, delete_otp,update_otp_attempts
+from utils.redis_service import store_otp, get_otp, delete_otp, update_otp_attempts
 from utils.email_service import send_email
 from config import Config
 import datetime
@@ -21,7 +20,6 @@ def send_otp():
     """Generate and send OTP"""
     data = request.json
     email = data.get("email")
-
     if not email:
         return jsonify({"message": "Email is required"}), 400
 
@@ -30,9 +28,13 @@ def send_otp():
 
     response = send_email(email, otp)
     if not response:
-        jsonify({"message":"Internal Server Error"}),500
+        return jsonify({"message": "Internal Server Error"}), 500
         
-    signed_data = jwt.encode({"email": email, "timestamp": int(time.time())}, Config.SIGNING_JWT_SECRET, algorithm="HS256")
+    signed_data = jwt.encode(
+        {"email": email, "timestamp": int(time.time())},
+        Config.SIGNING_JWT_SECRET,
+        algorithm="HS256"
+    )
     
     return jsonify({"message": "OTP sent successfully", "signed_data": signed_data})
 
@@ -40,7 +42,6 @@ def send_otp():
 def verify_otp():
     """Verify OTP"""
     data = request.json
-    # print(data)
     email = data.get("email")
     otp = data.get("otp")
     signed_data = data.get("signed_data")
@@ -58,34 +59,31 @@ def verify_otp():
         return jsonify({"message": "Invalid OTP session"}), 400
 
     stored_otp_data = get_otp(email)
-
     if not stored_otp_data:
         return jsonify({"message": "OTP expired or invalid"}), 400
 
     if stored_otp_data["otp"] != otp:
         attempts_left = int(stored_otp_data["attempts_left"]) - 1
-        update_otp_attempts(email,attempts_left)
+        update_otp_attempts(email, attempts_left)
         if attempts_left <= 0:
             delete_otp(email)
             return jsonify({"message": "Too many failed attempts. Request a new OTP."}), 403
         else:
-            print(attempts_left)
-            return jsonify({"message": f"Invalid OTP attempts left: {attempts_left}"}), 400
+            return jsonify({"message": f"Invalid OTP. Attempts left: {attempts_left}"}), 400
 
     delete_otp(email)
 
     user = User.query.filter_by(email=email).first()
     if not user:
-        new_user = User(email=email)
-        db.session.add(new_user)
+        user = User(email=email)
+        db.session.add(user)
         db.session.commit()
 
-    # **Generate JWT Token**
-    expiration_time = datetime.datetime.utcnow() + datetime.timedelta(hours=2)  # Token valid for 2 hours
-    token_payload = {
-        "sub": email,
-        "exp": expiration_time
-    }
+    # Generate JWT token (valid for 2 hours)
+    expiration_time = datetime.datetime.utcnow() + datetime.timedelta(hours=2)
+    token_payload = {"sub": email, "exp": expiration_time}
     jwt_token = jwt.encode(token_payload, Config.SIGNING_JWT_SECRET, algorithm="HS256")
 
-    return jsonify({"message": "OTP verified successfully", "token": jwt_token})
+    # Build the redirect URL (for example, to the chat page)
+    redirect_url = url_for("chat.chat_page", token=jwt_token, _external=True)
+    return jsonify({"message": "OTP verified successfully", "redirect_url": redirect_url})

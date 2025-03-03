@@ -3,15 +3,14 @@ import os
 import requests
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-
-from config import Config
 from werkzeug.utils import secure_filename
-from datetime import datetime
-
 from pathlib import Path
+import time
+
 import sys
 sys.path.append(str(Path(__file__).parents[1]))
 
+from config import Config
 from database import db
 from utils.redis_service import store_upload_link, get_upload_link, delete_upload_link
 from database.models import Document
@@ -36,9 +35,6 @@ def generate_upload_link():
     return jsonify({"message": "Upload link generated", "upload_id": upload_id})
 
 
-import time
-import requests
-
 def scan_file(file_path):
     """Scans the file using VirusTotal API before saving it."""
     api_key = Config.VIRUS_TOTAL_API_KEY
@@ -54,14 +50,14 @@ def scan_file(file_path):
     
     scan_result = response.json()
     analysis_id = scan_result["data"]["id"]  # Extract analysis ID
-
+    # print(scan_result)    
     # Step 2: Poll the results
     analysis_url = f"https://www.virustotal.com/api/v3/analyses/{analysis_id}"
     
     for _ in range(10):  # Retry for some time before giving up
         time.sleep(5)  # Wait before checking results
         result_response = requests.get(analysis_url, headers=headers)
-        
+        # print("response result is : ",result_response)
         if result_response.status_code != 200:
             return None  # API failure
 

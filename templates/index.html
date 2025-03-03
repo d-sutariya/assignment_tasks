@@ -44,7 +44,6 @@
       .then(response => response.json())
       .then(data => {
         document.getElementById("responseMessage").innerText = data.message;
-
         if (data.signed_data) {
           signedData = data.signed_data; // Store signed_data for later verification
           document.getElementById("otpVerifyForm").classList.remove("hidden");
@@ -54,7 +53,6 @@
     }
 
     function verifyOTP() {
-    
       document.getElementById("emailForm").classList.add("hidden");
 
       const email = document.getElementById("email").value;
@@ -66,14 +64,17 @@
         body: JSON.stringify({
           email: email,
           otp: otp,
-          signed_data: signedData // Include signed_data received from backend
+          signed_data: signedData
         })
       })
       .then(response => response.json())
       .then(data => {
-        document.getElementById("verificationMessage").innerText = ""
-        console.log(data.message)
-        document.getElementById("verificationMessage").innerText = data.message;
+        // Check if the response includes a redirect URL
+        if (data.redirect_url) {
+          window.location.href = data.redirect_url;
+        } else {
+          document.getElementById("verificationMessage").innerText = data.message;
+        }
       })
       .catch(error => console.error("Error:", error));
     }

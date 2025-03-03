@@ -3,6 +3,7 @@ from config import Config
 from database import init_db
 from routes.auth import auth_bp
 from routes.file_upload import upload_bp
+from routes.chat_routes import chat_bp
 from flask_jwt_extended import JWTManager
 
 app = Flask(__name__)
@@ -14,6 +15,7 @@ JWTManager(app)
 # Register Blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(upload_bp)
+app.register_blueprint(chat_bp)
 
 @app.route("/")
 def index():

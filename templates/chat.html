@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chat & File Upload</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <style>
+    /* Inline styles to improve layout if needed */
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f1f1f1;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+    .chat-container {
+      background: #fff;
+      width: 90%;
+      max-width: 600px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      padding: 20px;
+    }
+    .chat-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    .section {
+      margin-bottom: 20px;
+      border: 1px solid #ddd;
+      padding: 15px;
+      border-radius: 4px;
+    }
+    .section h3 {
+      margin-top: 0;
+    }
+    input[type="text"], input[type="file"] {
+      width: calc(100% - 22px);
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 10px 20px;
+      background-color: #007BFF;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    .response-area {
+      background: #f9f9f9;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 4px;
+      font-size: 14px;
+      min-height: 40px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="chat-header">
+      <h2>Chat & File Upload</h2>
+    </div>
+    
+    <!-- File Upload Section -->
+    <div class="section" id="uploadSection">
+      <h3>File Upload</h3>
+      <input type="file" id="fileInput">
+      <button onclick="uploadFile()">Upload File</button>
+      <div id="uploadStatus" class="response-area"></div>
+    </div>
+    
+    <!-- Chat Section -->
+    <div class="section" id="chatSection">
+      <h3>Chat</h3>
+      <input type="text" id="chatQuery" placeholder="Ask: what is my file name?">
+      <button onclick="sendChatQuery()">Send</button>
+      <div id="chatResponse" class="response-area"></div>
+    </div>
+  </div>
+
+  <script>
+    // Retrieve JWT token from the URL query parameter and store in variable
+    let token = "";
+    document.addEventListener("DOMContentLoaded", function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      token = urlParams.get("token");
+      if (!token) {
+        alert("Authentication failed. Redirecting to login.");
+        window.location.href = "/";
+      }
+    });
+
+    async function uploadFile() {
+      const fileInput = document.getElementById("fileInput");
+      if (fileInput.files.length === 0) {
+        alert("Please select a file to upload.");
+        return;
+      }
+
+      // Step 1: Get ephemeral upload link
+      const linkResponse = await fetch("/generate_upload_link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        }
+      });
+      const linkResult = await linkResponse.json();
+      if (!linkResponse.ok) {
+        document.getElementById("uploadStatus").innerText = linkResult.message;
+        return;
+      }
+      const uploadId = linkResult.upload_id;
+
+      // Step 2: Upload file using the obtained upload ID
+      const formData = new FormData();
+      formData.append("file", fileInput.files[0]);
+      formData.append("upload_id", uploadId);
+
+      const uploadResponse = await fetch("/upload", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
+        body: formData
+      });
+      const uploadResult = await uploadResponse.json();
+      document.getElementById("uploadStatus").innerText = uploadResult.message;
+    }
+
+    async function sendChatQuery() {
+      const query = document.getElementById("chatQuery").value;
+      if (!query) {
+        alert("Please type your query.");
+        return;
+      }
+      const response = await fetch("/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: query })
+      });
+      const result = await response.json();
+      document.getElementById("chatResponse").innerText = result.response;
+    }
+  </script>
+</body>
+</html>
