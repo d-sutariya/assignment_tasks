@@ -26,12 +26,17 @@ def allowed_file(filename):
 @upload_bp.route("/generate_upload_link", methods=["POST"])
 @jwt_required()
 def generate_upload_link():
+    
     """Generate a temporary upload link for a user."""
-    user_email = get_jwt_identity()
+    try:
+        user_email = get_jwt_identity()
 
-    upload_id = str(uuid.uuid4())
-    store_upload_link(upload_id, user_email, ttl=900)  # Valid for 15 minutes
-
+        upload_id = str(uuid.uuid4())
+        store_upload_link(upload_id, user_email, ttl=900)  # Valid for 15 minutes
+        # print(upload_id)
+    except Exception as e:
+        jsonify({"message":e})
+    
     return jsonify({"message": "Upload link generated", "upload_id": upload_id})
 
 
@@ -82,7 +87,7 @@ def upload_file():
     upload_data = get_upload_link(upload_id)
     if not upload_data:
         return jsonify({"message": "Upload link expired or invalid"}), 400
-
+    print(upload_data)
     user_email = get_jwt_identity()
 
     if not user_email or user_email != upload_data["email"]:
