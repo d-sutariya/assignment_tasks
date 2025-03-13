@@ -4,3 +4,4 @@ __pycache__/
 instance/
 uploaded_files/
 exp.py 
+vector_store/
