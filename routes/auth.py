@@ -33,7 +33,7 @@ def send_otp():
             {"email": email, "timestamp": int(time.time())},
             Config.SIGNING_JWT_SECRET,
             algorithm="HS256"
-        )
+        )   
         
         # Render the OTP verification page with hidden fields for email and signed_data
         return render_template("otp_verify.html", email=email, signed_data=signed_data, message="OTP sent successfully")

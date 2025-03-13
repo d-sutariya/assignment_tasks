@@ -2,7 +2,6 @@ import redis
 import time
 from config import Config
 
-
 # Redis connection
 redis_client = redis.StrictRedis(host=Config.REDIS_HOST, port=Config.REDIS_PORT, decode_responses=True)
 
