@@ -23,6 +23,7 @@ class Config:
     AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY")
     AWS_SECRET_KEY = os.getenv("AWS_SECRET_KEY")
     AWS_S3_BUCKET = os.getenv("AWS_S3_BUCKET")
+    
     # Tell Flask-JWT-Extended to look for the token in cookies
     JWT_TOKEN_LOCATION = ["cookies"]
 

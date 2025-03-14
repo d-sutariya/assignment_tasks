@@ -12,6 +12,7 @@ app.config.from_object(Config)
 # Initialize Database
 init_db(app)
 JWTManager(app)
+
 # Register Blueprints
 app.register_blueprint(auth_bp)
 app.register_blueprint(upload_bp)

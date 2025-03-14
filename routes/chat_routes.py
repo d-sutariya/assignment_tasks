@@ -1,6 +1,5 @@
 from flask import Blueprint, render_template, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from database.models import Document
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI

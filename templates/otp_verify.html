@@ -15,8 +15,6 @@
       <p class="error">{{ error }}</p>
     {% endif %}
     <form method="POST" action="{{ url_for('auth.verify_otp') }}">
-      <input type="hidden" name="email" value="{{ email }}">
-      <input type="hidden" name="signed_data" value="{{ signed_data }}">
       <label for="otp">Enter OTP:</label>
       <input type="text" id="otp" name="otp" required>
       <button type="submit">Verify OTP</button>
