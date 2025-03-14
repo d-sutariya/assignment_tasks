@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify, url_for, redirect, render_templat
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import jwt
 import random
+import uuid
 import time
 import datetime
 from pathlib import Path
@@ -75,7 +76,7 @@ def verify_otp():
     
     user = User.query.filter_by(email=email).first()
     if not user:
-        user = User(email=email)
+        user = User(email=email,user_uuid=str(uuid.uuid4()))
         db.session.add(user)
         db.session.commit()
     

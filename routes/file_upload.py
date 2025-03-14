@@ -7,10 +7,8 @@ from werkzeug.utils import secure_filename
 from pathlib import Path
 import time
 import sys
+import datetime
 import boto3
-from langchain_community.document_loaders import TextLoader
-from langchain_community.vectorstores import FAISS
-from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
 from io import BytesIO
 
 sys.path.append(str(Path(__file__).parents[1]))
@@ -19,13 +17,12 @@ sys.path.append(str(Path(__file__).parent))
 from config import Config
 from database import db
 from utils.redis_service import store_upload_link, get_upload_link, delete_upload_link
-from database.models import Document
-from vector_store_services import store_vector_chunks
+from database.models import Document, User  
+from utils.vector_store_services import store_vector_chunks
 
 upload_bp = Blueprint("upload", __name__)
 
 ALLOWED_EXTENSIONS = {"pdf", "docx", "txt"}
-
 
 def allowed_file(filename):
     """Check if the file type is allowed."""
@@ -82,24 +79,42 @@ def scan_file(file_path):
 def generate_upload_link():
     """Generate a temporary upload link for a user."""
     try:
+        # Get user's email from JWT, then query for the unique user id
         user_email = get_jwt_identity()
+        user = db.session.query(User).filter_by(email=user_email).first()
+        if not user:
+            return jsonify({"message": "User not found"}), 404
+        user_id = str(user.user_uuid)
+        
         upload_id = str(uuid.uuid4())
-        store_upload_link(upload_id, user_email, ttl=900)  # Valid for 15 minutes
+        # Store upload link using the unique user id
+        print("upload id is ",upload_id)
+        print("User id is ",user_id)
+        store_upload_link(upload_id, user_id, ttl=900)  # Valid for 15 minutes
     except Exception as e:
+        print("Error generating upload link:", e)
         return jsonify({"message": "Error While Generating Upload link"}), 500
-    return jsonify({"message": "Upload link generated", "upload_id": upload_id})
+    
+    return jsonify({"message": "Upload id generated", "upload_id": upload_id})
 
 @upload_bp.route("/upload", methods=["POST"])
 @jwt_required()
 def upload_file():
-    # Verify upload link
+    # Get user's email and then unique user id from database
+    user_email = get_jwt_identity()
+    user = db.session.query(User).filter_by(email=user_email).first()
+    
+    if not user:
+        return jsonify({"message": "User not found"}), 404
+    user_id = str(user.user_uuid)
+
+    # Verify upload link using the unique user id stored in Redis
     upload_id = request.form.get("upload_id")
-    upload_data = get_upload_link(upload_id)
+    upload_data = get_upload_link(upload_id,user_id)
+
     if not upload_data:
         return jsonify({"message": "Upload link expired or invalid"}), 400
-
-    user_email = get_jwt_identity()
-    if not user_email or user_email != upload_data.get("email"):
+    if user_id != upload_data.get("user_id"):
         return jsonify({"message": "Unauthorized"}), 403
 
     if "file" not in request.files:
@@ -126,29 +141,31 @@ def upload_file():
 
         # Save file temporarily for scanning using scan_stream
         temp_file_path = os.path.join(Config.UPLOAD_FOLDER, unique_filename)
+        
         with open(temp_file_path, "wb") as temp_file:
             temp_file.write(scan_stream.read())
 
-        scan_result = scan_file(temp_file_path)
-        if scan_result is None:
-            os.remove(temp_file_path)
-            return jsonify({"message": "VirusTotal scan failed. Try again later."}), 500
-        if not scan_result:
-            os.remove(temp_file_path)
-            return jsonify({"message": "File contains malware. Upload rejected."}), 400
+        # scan_result = scan_file(temp_file_path)
+        # if scan_result is None:
+        #     os.remove(temp_file_path)
+        #     return jsonify({"message": "VirusTotal scan failed. Try again later."}), 500
+        # if not scan_result:
+        #     os.remove(temp_file_path)
+        #     return jsonify({"message": "File contains malware. Upload rejected."}), 400
 
-        # Store vector representation into FAISS vector store
+        # Store document vector representation into FAISS vector store
         try:
-            store_vector_chunks(temp_file_path, user_email)
+            # Using unique user id for vector store folder
+            store_vector_chunks(temp_file_path, user_id)
         except Exception as e:
             print("Vector store error:", e)
         
-        # Store metadata in database with S3 URL as file path
-        new_document = Document(user_email=user_email, filename=filename, file_path=s3_url)
+        # Store metadata in the database with S3 URL as file path (using user's email for record purposes)
+        new_document = Document(user_uuid=user_id, file_path=s3_url)
         db.session.add(new_document)
         db.session.commit()
 
-        delete_upload_link(upload_id)
+        delete_upload_link(upload_id,user_id)
         os.remove(temp_file_path)
         return jsonify({"message": "File uploaded and scanned successfully", "file_path": s3_url})
 

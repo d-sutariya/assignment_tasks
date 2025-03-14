@@ -7,6 +7,8 @@ from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 from config import Config
 import os
 from pathlib import Path
+from database import db
+from database.models import User
 
 chat_bp = Blueprint("chat", __name__)
 
@@ -20,13 +22,17 @@ def chat_page():
 def user_query():
     # Get the authenticated user's email
     user_email = get_jwt_identity()
+    
     user_query_text = request.json.get("query")
     
     if not user_query_text:
         return jsonify({"response": "No query provided."}), 400
 
+    # get user id 
+    user_id = db.session.query(User).filter_by(email=user_email).first()
+
     # Construct the FAISS index path
-    index_path = str(Path(__file__).parents[1] / 'vector_store' / f"{user_email}_index")
+    index_path = str(Path(__file__).parents[1] / 'vector_store' / f"{user_id.user_uuid}_index")
     index_path = os.path.abspath(index_path)
 
     # Check if the FAISS index folder and required files exist
@@ -42,7 +48,7 @@ def user_query():
     # Initialize the embedding model
     embedder = GoogleGenerativeAIEmbeddings(
         google_api_key=Config.GEMINI_API_KEY,
-        model="models/embedding-001"  # Corrected model name
+        model="models/embedding-001"  
     )
     
     try:
@@ -53,14 +59,8 @@ def user_query():
     # Perform a semantic similarity search
     retrieved_docs = vector_store.similarity_search(user_query_text)
 
-    # Filter retrieved docs for the correct user
-    filtered_docs = [doc for doc in retrieved_docs if doc.metadata.get("user_email") == user_email]
-    
-    if not filtered_docs:
-        return jsonify({"response": "No relevant documents found for your query."})
-
     # Combine the content of the filtered documents
-    context = " ".join([doc.page_content for doc in filtered_docs])
+    context = " ".join([doc.page_content for doc in retrieved_docs])
     # print(context)
     # Create a RAG prompt
     prompt = f"Query: {user_query_text}\nContext: {context}"
