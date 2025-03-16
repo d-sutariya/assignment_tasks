@@ -2,40 +2,50 @@ import os
 from langchain_community.document_loaders import TextLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain.schema import Document
 from langchain_google_genai.embeddings import GoogleGenerativeAIEmbeddings
+from langchain.schema import Document as LC_Document  # Use LangChain's Document type
 from config import Config
 
 def store_vector_chunks(filepath, user_uuid):
     """
     Loads file content from 'filepath', splits it into chunks, attaches the user's uuid as metadata,
     indexes the chunks into a FAISS vector store using Google Generative AI Embeddings,
-    and saves the vector store locally in a folder unique to the user.
+    and saves (or updates) the vector store locally in a folder unique to the user.
     """
     try:
-        # Load document(s) from the file
+        # Load document(s) from the file.
         loader = TextLoader(filepath)
-        docs = loader.load()  
+        docs = loader.load()  # List of Document objects with a 'page_content' attribute
 
-        # Use a character splitter for chunking
+        # Use a character splitter for chunking.
         splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-        chunks = []
+        new_chunks = []
         
         for doc in docs:
             text_chunks = splitter.split_text(doc.page_content)
             for chunk in text_chunks:
-                chunks.append(Document(page_content=chunk, metadata={"user_uuid": user_uuid}))
+                new_chunks.append(LC_Document(page_content=chunk, metadata={"user_uuid": user_uuid}))
 
-        # Create the embedding model (Fixed model name)
-        embedder = GoogleGenerativeAIEmbeddings(model = 'models/embedding-001',google_api_key=Config.GEMINI_API_KEY)
+        # Create the embedding model with the correct model name.
+        embedder = GoogleGenerativeAIEmbeddings(
+            google_api_key=Config.GEMINI_API_KEY,
+            model="models/embedding-001"
+        )
 
-        # Build the FAISS vector store from document chunks
-        vector_store = FAISS.from_documents(chunks, embedding=embedder)
-
-        # Save the FAISS index locally
+        # Define the FAISS index path for the user.
         save_dir = os.path.join("vector_store", f"{user_uuid}_index")
         os.makedirs(save_dir, exist_ok=True)
+        
+        # If the index exists (i.e. the folder is not empty), load it; otherwise, create a new one.
+        if os.listdir(save_dir):
+            vector_store = FAISS.load_local(save_dir, embedder)
+            vector_store.add_documents(new_chunks)
+        else:
+            vector_store = FAISS.from_documents(new_chunks, embedding=embedder)
+        
+        # Save (or update) the FAISS vector store locally.
         vector_store.save_local(save_dir)
     except Exception as e:
-        print(e)
+        print("Error in store_vector_chunks:", e)
+
 

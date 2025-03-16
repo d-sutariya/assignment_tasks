@@ -27,7 +27,7 @@ def user_query():
     if not user_query_text:
         return jsonify({"response": "No query provided."}), 400
 
-    # get user id 
+    # get user id to load the vector store
     user_id = db.session.query(User).filter_by(email=user_email).first()
 
     # Construct the FAISS index path
@@ -60,9 +60,9 @@ def user_query():
 
     # Combine the content of the filtered documents
     context = " ".join([doc.page_content for doc in retrieved_docs])
-    # print(context)
+    print(context)
     # Create a RAG prompt
-    prompt = f"Query: {user_query_text}\nContext: {context}"
+    prompt = f"Systemmessage: If you feel the context is not sufficient answer based on your own knowledge \n Query: {user_query_text}\nContext: {context}"
     
     # Call the Gemini API using ChatGoogleGenerativeAI
     chat_model = ChatGoogleGenerativeAI(model = "gemini-1.5-flash",google_api_key=Config.GEMINI_API_KEY)

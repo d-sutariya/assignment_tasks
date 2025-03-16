@@ -50,6 +50,7 @@ def scan_file(file_path):
     upload_url = "https://www.virustotal.com/api/v3/files"
     headers = {"x-apikey": api_key}
 
+    # sends file to the url
     with open(file_path, "rb") as file:
         response = requests.post(upload_url, headers=headers, files={"file": file})
     
@@ -123,7 +124,8 @@ def upload_file():
     file = request.files["file"]
     if file.filename == "":
         return jsonify({"message": "No selected file"}), 400
-
+    
+    # check whether the file type is allowed
     if file and allowed_file(file.filename):
         filename = secure_filename(file.filename)
         unique_filename = f"{uuid.uuid4()}_{filename}"

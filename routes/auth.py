@@ -17,14 +17,17 @@ auth_bp = Blueprint("auth", __name__)
 @auth_bp.route("/send_otp", methods=["GET", "POST"])
 def send_otp():
     if request.method == "POST":
+        # get the user email from the form.
         email = request.form.get("email")
         if not email:
             return render_template("index.html", error="Email is required")
     
+        #generate random OTP
         otp = str(random.randint(100000, 999999))
+        #Stores it in the redis database
         store_otp(email, otp)
     
-        response = send_email(email, otp)
+        response = send_email(email, otp) # send otp in the email
         if not response:
             return render_template("index.html", error="Internal Server Error")
         
@@ -35,7 +38,8 @@ def send_otp():
         
         # Render OTP verification page and set temporary token as an HTTP-only cookie
         response = make_response(render_template("otp_verify.html",message="OTP sent successfully"))
-        response.set_cookie("temp_token", signed_data, httponly=True, secure=False, samesite="Lax")
+        # set JWT token in cookie
+        response.set_cookie("temp_token", signed_data, httponly=True, secure=False, samesite="Lax") 
         return response
     
     return render_template("index.html")
@@ -71,6 +75,7 @@ def verify_otp():
         attempts_left = int(stored_otp_data["attempts_left"]) - 1
         update_otp_attempts(email, attempts_left)
         if attempts_left <= 0:
+            # delete otp from redis
             delete_otp(email)
             return render_template("index.html", error="Too many failed attempts. Request a new OTP.")
         else:

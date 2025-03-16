@@ -40,11 +40,12 @@
     // Since the token is stored in an HTTP-only cookie, it is automatically sent with requests.
     async function uploadFile() {
       const fileInput = document.getElementById("fileInput");
+      // check whether the input is there or not
       if (fileInput.files.length === 0) {
         alert("Please select a file to upload.");
         return;
       }
-      // Step 1: Get ephemeral upload link
+      //Get ephemeral upload link
       const linkResponse = await fetch("/generate_upload_link", {
         method: "POST",
         headers: { "Content-Type": "application/json" }
@@ -55,7 +56,7 @@
         return;
       }
       const uploadId = linkResult.upload_id;
-      // Step 2: Upload file using the obtained upload ID
+      //Upload file using the obtained upload ID
       const formData = new FormData();
       formData.append("file", fileInput.files[0]);
       formData.append("upload_id", uploadId);

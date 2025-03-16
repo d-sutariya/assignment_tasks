@@ -10,9 +10,9 @@ def store_otp(email, otp):
     otp_id = f"otp:{email}"
     otp_data = {
         "otp": otp,
-        "attempts_left": 5,
-        "timestamp": int(time.time())
+        "attempts_left": 5
     }
+    # set key value pair
     redis_client.hmset(otp_id, otp_data)
     redis_client.expire(otp_id, 300)  # OTP valid for 5 minutes
 
@@ -27,6 +27,7 @@ def delete_otp(email):
 def update_otp_attempts(email, attempts_left):
     """Update only the attempts left in Redis without changing expiry"""
     otp_id = f"otp:{email}"
+    # first fetch the data then update it 
     otp_data = get_otp(email)
     if otp_data:
         otp_data["attempts_left"] = attempts_left  # Update attempts
