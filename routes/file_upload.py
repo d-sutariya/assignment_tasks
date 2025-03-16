@@ -137,9 +137,9 @@ def upload_file():
         scan_stream = BytesIO(file_data)
 
         # Upload file to S3 using s3_stream
-        s3_url = upload_file_to_s3(s3_stream, unique_filename)
-        if s3_url is None:
-            return jsonify({"message": "Error uploading file to S3"}), 500
+        # s3_url = upload_file_to_s3(s3_stream, unique_filename)
+        # if s3_url is None:
+        #     return jsonify({"message": "Error uploading file to S3"}), 500
 
         # Save file temporarily for scanning using scan_stream
         temp_file_path = os.path.join(Config.UPLOAD_FOLDER, unique_filename)
@@ -158,17 +158,19 @@ def upload_file():
         # Store document vector representation into FAISS vector store
         try:
             # Using unique user id for vector store folder
-            store_vector_chunks(temp_file_path, user_id)
+            print("file path in upload end point is ",temp_file_path)
+            if not store_vector_chunks(temp_file_path, user_id):
+                jsonify({"mesage":"Error While storing Chunks"}),500
         except Exception as e:
             print("Vector store error:", e)
         
         # Store metadata in the database with S3 URL as file path (using user's email for record purposes)
-        new_document = Document(user_uuid=user_id, file_path=s3_url)
+        new_document = Document(user_uuid=user_id, file_path=temp_file_path)
         db.session.add(new_document)
         db.session.commit()
 
         delete_upload_link(upload_id,user_id)
         os.remove(temp_file_path)
-        return jsonify({"message": "File uploaded and scanned successfully", "file_path": s3_url})
+        return jsonify({"message": "File uploaded and scanned successfully"})
 
     return jsonify({"message": "File type not allowed"}), 400

@@ -4,4 +4,6 @@ __pycache__/
 instance/
 uploaded_files/
 exp.py 
+experiment.ipynb
+experiment/
 vector_store/
